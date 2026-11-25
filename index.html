@@ -1,0 +1,1984 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NexoEstudio — Productividad y Estudio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            carbon: '#090d16',
+            panel: '#111827',
+            surface: '#161f33',
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    /* Mejoras sutiles para volteo 3D de flashcards y scrollbars en modo oscuro */
+    body {
+      background-color: #090d16;
+      color: #f1f5f9;
+      font-family: 'Inter', system-ui, sans-serif;
+    }
+
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+
+    .flashcard-scene {
+      perspective: 1200px;
+    }
+
+    .flashcard-inner {
+      position: relative;
+      width: 100%;
+      min-height: 270px;
+      transform-style: preserve-3d;
+      transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .flashcard-inner.is-flipped {
+      transform: rotateY(180deg);
+    }
+
+    .flashcard-face {
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+    }
+
+    .flashcard-back {
+      transform: rotateY(180deg);
+    }
+
+    /* Foco accesible de alto contraste */
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    textarea:focus-visible,
+    a:focus-visible {
+      outline: 2px solid #22d3ee;
+      outline-offset: 2px;
+    }
+
+    /* Scrollbar discreta */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0b1120;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #26334d;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #384b70;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-carbon text-slate-100 antialiased selection:bg-cyan-400/20 selection:text-cyan-200">
+
+  <!-- Barra superior persistente con reloj en tiempo real, fecha, navegación y acceso rápido -->
+  <header class="sticky top-0 z-30 border-b border-slate-800/90 bg-slate-950/90 backdrop-blur-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3">
+      <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+        <!-- Marca y Reloj / Fecha -->
+        <div class="flex flex-wrap items-center justify-between sm:justify-start gap-4">
+          <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-400 to-emerald-400 flex items-center justify-center text-slate-950 font-extrabold shadow-lg shadow-cyan-500/20" aria-hidden="true">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+              </svg>
+            </div>
+            <div>
+              <span class="font-bold tracking-tight text-white text-base sm:text-lg">Nexo<span class="text-cyan-400">Estudio</span></span>
+              <p class="text-[11px] text-slate-400 leading-none">Espacio de enfoque y repaso</p>
+            </div>
+          </div>
+
+          <div class="h-7 w-px bg-slate-800 hidden sm:block" aria-hidden="true"></div>
+
+          <!-- Reloj digital en tiempo real con segundos y fecha -->
+          <div class="flex items-center gap-3 bg-panel border border-slate-800/90 rounded-xl px-3 py-1.5" aria-label="Reloj y fecha actual">
+            <span id="header-clock" class="font-mono text-sm sm:text-base font-bold text-cyan-300 tabular-nums">--:--:--</span>
+            <span class="text-slate-600" aria-hidden="true">•</span>
+            <span id="header-date" class="text-xs sm:text-sm text-slate-300 capitalize truncate max-w-[175px] sm:max-w-none">Cargando fecha...</span>
+          </div>
+        </div>
+
+        <!-- Navegación principal por pestañas y acciones rápidas -->
+        <div class="flex flex-wrap items-center justify-between sm:justify-end gap-2">
+          <nav aria-label="Secciones principales" role="tablist" class="flex items-center gap-1.5 bg-panel p-1 rounded-xl border border-slate-800/90 w-full sm:w-auto overflow-x-auto">
+            <button
+              id="tab-dashboard"
+              role="tab"
+              aria-selected="true"
+              aria-controls="view-dashboard"
+              data-tab="dashboard"
+              class="nav-tab flex-1 sm:flex-initial whitespace-nowrap px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 bg-cyan-400/15 text-cyan-300 border border-cyan-400/40 shadow-sm">
+              <span class="w-2 h-2 rounded-full bg-cyan-400" aria-hidden="true"></span>
+              Inicio
+            </button>
+            <button
+              id="tab-tasks"
+              role="tab"
+              aria-selected="false"
+              aria-controls="view-tasks"
+              data-tab="tasks"
+              class="nav-tab flex-1 sm:flex-initial whitespace-nowrap px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 border border-transparent">
+              <span class="w-2 h-2 rounded-full bg-emerald-400/70" aria-hidden="true"></span>
+              Tareas y Hábitos
+            </button>
+            <button
+              id="tab-flashcards"
+              role="tab"
+              aria-selected="false"
+              aria-controls="view-flashcards"
+              data-tab="flashcards"
+              class="nav-tab flex-1 sm:flex-initial whitespace-nowrap px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 border border-transparent">
+              <span class="w-2 h-2 rounded-full bg-amber-400/70" aria-hidden="true"></span>
+              Flashcards
+            </button>
+          </nav>
+
+          <!-- Acceso rápido a Pomodoro y gestión de datos -->
+          <div class="flex items-center gap-2 ml-auto sm:ml-1">
+            <button
+              id="quick-pomodoro-btn"
+              type="button"
+              title="Ir al Temporizador Pomodoro"
+              class="px-3 py-2 rounded-xl text-xs font-semibold bg-emerald-400/10 hover:bg-emerald-400/20 text-emerald-300 border border-emerald-400/30 transition flex items-center gap-1.5 tabular-nums">
+              <svg class="w-4 h-4 text-emerald-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
+              </svg>
+              <span id="quick-pomo-time">25:00</span>
+            </button>
+
+            <button
+              id="reset-demo-btn"
+              type="button"
+              title="Restaurar datos de ejemplo iniciales"
+              class="px-3 py-2 rounded-xl text-xs font-medium bg-panel hover:bg-slate-800 text-slate-300 border border-slate-800 transition">
+              Restaurar demo
+            </button>
+
+            <button
+              id="clear-all-btn"
+              type="button"
+              title="Limpiar todos los datos guardados"
+              class="px-3 py-2 rounded-xl text-xs font-medium bg-panel hover:bg-rose-950/60 text-rose-300 border border-slate-800 hover:border-rose-500/40 transition">
+              Limpiar todo
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Banner de alerta / notificación no intrusiva (sin alert ni confirm) -->
+  <div id="toast-banner" role="status" aria-live="polite" class="fixed bottom-5 right-5 z-50 max-w-sm w-[calc(100%-2.5rem)] pointer-events-none opacity-0 translate-y-3 transition-all duration-300">
+    <div id="toast-content" class="pointer-events-auto rounded-2xl border border-cyan-400/40 bg-slate-900/95 backdrop-blur-md px-4 py-3 shadow-2xl flex items-center justify-between gap-3">
+      <div class="flex items-center gap-2.5 text-xs sm:text-sm text-slate-100">
+        <span id="toast-dot" class="w-2.5 h-2.5 rounded-full bg-cyan-400 shrink-0"></span>
+        <span id="toast-message">Listo</span>
+      </div>
+      <button id="toast-close" type="button" aria-label="Cerrar notificación" class="text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded">✕</button>
+    </div>
+  </div>
+
+  <!-- Modal ligero para confirmar limpieza total sin usar window.confirm() -->
+  <div id="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+    <div class="w-full max-w-md rounded-2xl bg-panel border border-slate-700/80 p-6 shadow-2xl space-y-4">
+      <div class="flex items-start gap-3">
+        <div class="w-10 h-10 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 flex items-center justify-center shrink-0 font-bold" aria-hidden="true">!</div>
+        <div>
+          <h2 id="confirm-modal-title" class="text-base font-bold text-white">¿Limpiar todos los datos?</h2>
+          <p class="text-xs sm:text-sm text-slate-400 mt-1">Se borrarán tus recordatorios, notas, enlaces, tareas, hábitos y mazos de flashcards guardados en este navegador. También puedes restaurar los ejemplos cuando quieras.</p>
+        </div>
+      </div>
+      <div class="flex items-center justify-end gap-2.5 pt-2">
+        <button id="confirm-cancel-btn" type="button" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 transition">Cancelar</button>
+        <button id="confirm-accept-btn" type="button" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-rose-500 hover:bg-rose-400 text-slate-950 transition">Sí, limpiar todo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Contenido principal -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
+
+    <!-- =====================================================================
+         MÓDULO 1: PANEL DE INICIO PERSONAL (DASHBOARD)
+         ===================================================================== -->
+    <section id="view-dashboard" role="tabpanel" aria-labelledby="tab-dashboard" class="space-y-6">
+      <!-- Encabezado de bienvenida y resumen rápido -->
+      <div class="rounded-2xl bg-gradient-to-r from-panel via-surface to-panel border border-slate-800 p-5 sm:p-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+        <div class="space-y-1.5">
+          <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-semibold bg-cyan-400/10 text-cyan-300 border border-cyan-400/25">
+            <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
+            Panel de Inicio Personal
+          </div>
+          <h1 id="greeting-title" class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">¡Hola! Listo para avanzar hoy</h1>
+          <p class="text-xs sm:text-sm text-slate-400 max-w-2xl">Centraliza tus recordatorios del día, notas rápidas persistentes, accesos directos frecuentes y el pulso de tus hábitos y estudio.</p>
+        </div>
+
+        <!-- Tarjetas métricas de resumen -->
+        <div class="grid grid-cols-3 gap-3 shrink-0">
+          <div class="rounded-xl bg-carbon/80 border border-slate-800 px-3.5 py-2.5 text-center">
+            <div id="dash-reminders-pending" class="font-mono text-lg sm:text-xl font-bold text-cyan-300 tabular-nums">0</div>
+            <div class="text-[11px] text-slate-400">Recordatorios</div>
+          </div>
+          <div class="rounded-xl bg-carbon/80 border border-slate-800 px-3.5 py-2.5 text-center">
+            <div id="dash-habits-done" class="font-mono text-lg sm:text-xl font-bold text-emerald-300 tabular-nums">0/0</div>
+            <div class="text-[11px] text-slate-400">Hábitos hoy</div>
+          </div>
+          <div class="rounded-xl bg-carbon/80 border border-slate-800 px-3.5 py-2.5 text-center">
+            <div id="dash-tasks-pending" class="font-mono text-lg sm:text-xl font-bold text-amber-300 tabular-nums">0</div>
+            <div class="text-[11px] text-slate-400">Tareas activas</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cuadrícula principal del Dashboard -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Reloj destacado + Recordatorios del día (7 cols) -->
+        <div class="lg:col-span-7 space-y-6">
+          <!-- Reloj digital ampliado -->
+          <div class="rounded-2xl bg-panel border border-slate-800 p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <span class="text-xs font-semibold uppercase tracking-wider text-cyan-400">Hora local en vivo</span>
+              <div id="hero-clock" class="font-mono text-3xl sm:text-5xl font-bold text-white tracking-tight mt-1 tabular-nums">--:--:--</div>
+              <p id="hero-date" class="text-sm text-slate-400 mt-1 capitalize">Cargando...</p>
+            </div>
+            <div class="flex sm:flex-col items-end justify-between sm:justify-center gap-2 border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-800/80">
+              <span class="text-xs text-slate-400">Sesiones Pomodoro hoy</span>
+              <span id="dash-pomo-count" class="font-mono text-2xl font-bold text-emerald-400 tabular-nums">0</span>
+            </div>
+          </div>
+
+          <!-- Recordatorios del día -->
+          <div class="rounded-2xl bg-panel border border-slate-800 p-5 sm:p-6 space-y-4">
+            <div class="flex items-center justify-between gap-2">
+              <div>
+                <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-cyan-400" aria-hidden="true"></span>
+                  Recordatorios del día
+                </h2>
+                <p class="text-xs text-slate-400">Puntos clave que no quieres pasar por alto hoy.</p>
+              </div>
+              <button id="clear-done-reminders-btn" type="button" class="text-xs font-medium text-slate-400 hover:text-cyan-300 px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-800 transition">
+                Limpiar hechos
+              </button>
+            </div>
+
+            <form id="reminder-form" class="flex flex-col sm:flex-row gap-2.5">
+              <label for="reminder-input" class="sr-only">Nuevo recordatorio del día</label>
+              <input
+                id="reminder-input"
+                type="text"
+                required
+                placeholder="Ej. Enviar avance del proyecto antes de las 18:00..."
+                class="flex-1 rounded-xl bg-carbon border border-slate-700/80 px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-cyan-400 transition"
+              />
+              <button type="submit" class="px-4 py-2.5 rounded-xl text-sm font-semibold bg-cyan-400 hover:bg-cyan-300 text-slate-950 shadow-md shadow-cyan-500/15 transition shrink-0">
+                + Añadir
+              </button>
+            </form>
+
+            <ul id="reminders-list" class="space-y-2.5" aria-label="Lista de recordatorios del día"></ul>
+          </div>
+        </div>
+
+        <!-- Notas rápidas persistentes + Enlaces más usados (5 cols) -->
+        <div class="lg:col-span-5 space-y-6">
+          <!-- Notas rápidas persistentes -->
+          <div class="rounded-2xl bg-panel border border-slate-800 p-5 sm:p-6 space-y-3">
+            <div class="flex items-center justify-between gap-2">
+              <div>
+                <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-amber-400" aria-hidden="true"></span>
+                  Notas rápidas
+                </h2>
+                <p class="text-xs text-slate-400">Se guardan automáticamente al escribir.</p>
+              </div>
+              <span id="notes-save-status" class="text-[11px] font-medium px-2.5 py-1 rounded-full bg-emerald-400/10 text-emerald-300 border border-emerald-400/25">
+                Guardado
+              </span>
+            </div>
+
+            <label for="quick-notes-textarea" class="sr-only">Escribe tus notas rápidas</label>
+            <textarea
+              id="quick-notes-textarea"
+              rows="7"
+              placeholder="Anota ideas sueltas, fórmulas, claves temporales o temas para repasar..."
+              class="w-full rounded-xl bg-carbon border border-slate-700/80 p-3.5 text-sm text-slate-100 placeholder-slate-500 leading-relaxed focus:border-amber-400 transition resize-y"
+            ></textarea>
+
+            <div class="flex items-center justify-between text-xs text-slate-400">
+              <span id="notes-char-count" class="tabular-nums">0 caracteres</span>
+              <button id="clear-notes-btn" type="button" class="text-slate-400 hover:text-rose-300 transition">Borrar nota</button>
+            </div>
+          </div>
+
+          <!-- Enlaces más usados -->
+          <div class="rounded-2xl bg-panel border border-slate-800 p-5 sm:p-6 space-y-4">
+            <div>
+              <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-400" aria-hidden="true"></span>
+                Enlaces más usados
+              </h2>
+              <p class="text-xs text-slate-400">Tus herramientas de clase, correo o referencia a un clic.</p>
+            </div>
+
+            <form id="shortcut-form" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div class="sm:col-span-1">
+                <label for="shortcut-title" class="sr-only">Título del enlace</label>
+                <input
+                  id="shortcut-title"
+                  type="text"
+                  required
+                  placeholder="Título (ej. Campus Virtual)"
+                  class="w-full rounded-xl bg-carbon border border-slate-700/80 px-3 py-2 text-xs sm:text-sm text-white placeholder-slate-500 focus:border-emerald-400 transition"
+                />
+              </div>
+              <div class="sm:col-span-1">
+                <label for="shortcut-url" class="sr-only">URL del enlace</label>
+                <input
+                  id="shortcut-url"
+                  type="text"
+                  required
+                  placeholder="URL (ej. https://ejemplo.edu)"
+                  class="w-full rounded-xl bg-carbon border border-slate-700/80 px-3 py-2 text-xs sm:text-sm text-white placeholder-slate-500 focus:border-emerald-400 transition"
+                />
+              </div>
+              <button type="submit" class="sm:col-span-2 w-full py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold bg-emerald-400 hover:bg-emerald-300 text-slate-950 transition">
+                + Guardar acceso directo
+              </button>
+            </form>
+
+            <div id="shortcuts-list" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5" aria-label="Enlaces frecuentes"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =====================================================================
+         MÓDULO 2: TABLERO PERSONAL DE TAREAS Y HÁBITOS + POMODORO
+         ===================================================================== -->
+    <section id="view-tasks" role="tabpanel" aria-labelledby="tab-tasks" class="hidden space-y-6">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 rounded-2xl bg-panel border border-slate-800 p-5 sm:p-6">
+        <div>
+          <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-400/10 text-emerald-300 border border-emerald-400/25 mb-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            Ejecución Diaria y Enfoque
+          </div>
+          <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">Tablero de Tareas, Hábitos y Pomodoro</h1>
+          <p class="text-xs sm:text-sm text-slate-400 mt-0.5">Organiza pendientes por prioridad y asignatura, sostén tus hábitos clave y concentra bloques de estudio.</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Lista de pendientes (7 cols) -->
+        <div class="lg:col-span-7 rounded-2xl bg-panel border border-slate-800 p-5 sm:p-6 space-y-5">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 class="text-lg font-bold text-white">Lista de pendientes</h2>
+              <p class="text-xs text-slate-400">Filtra por estado y prioriza lo que importa hoy.</p>
+            </div>
+            <!-- Filtros: todas, pendientes, completadas -->
+            <div role="group" aria-label="Filtrar tareas" class="inline-flex rounded-xl bg-carbon p-1 border border-slate-800">
+              <button type="button" data-task-filter="all" class="task-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-400/15 text-cyan-300 border border-cyan-400/35 transition">
+                Todas
+              </button>
+              <button type="button" data-task-filter="pending" class="task-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white border border-transparent transition">
+                Pendientes
+              </button>
+              <button type="button" data-task-filter="completed" class="task-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white border border-transparent transition">
+                Completadas
+              </button>
+            </div>
+          </div>
+
+          <!-- Formulario para agregar tarea -->
+          <form id="task-form" class="grid grid-cols-1 sm:grid-cols-12 gap-2.5 bg-carbon/70 p-3.5 rounded-xl border border-slate-800/90">
+            <div class="sm:col-span-6">
+              <label for="task-title" class="sr-only">Descripción de la tarea</label>
+              <input
+                id="task-title"
+                type="text"
+                required
+                placeholder="Nueva tarea (ej. Resolver guía de cálculo)"
+                class="w-full rounded-xl bg-panel border border-slate-700/80 px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:border-cyan-400 transition"
+              />
+            </div>
+            <div class="sm:col-span-3">
+              <label for="task-subject" class="sr-only">Categoría o asignatura</label>
+              <input
+                id="task-subject"
+                type="text"
+                placeholder="Asignatura / Área"
+                class="w-full rounded-xl bg-panel border border-slate-700/80 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-cyan-400 transition"
+              />
+            </div>
+            <div class="sm:col-span-3">
+              <label for="task-priority" class="sr-only">Prioridad</label>
+              <select
+                id="task-priority"
+                class="w-full rounded-xl bg-panel border border-slate-700/80 px-3 py-2 text-sm text-white focus:border-cyan-400 transition">
+                <option value="alta">Prioridad Alta</option>
+                <option value="media" selected>Prioridad Media</option>
+                <option value="baja">Prioridad Baja</option>
+              </select>
+            </div>
+            <button type="submit" class="sm:col-span-12 py-2.5 px-4 rounded-xl text-sm font-semibold bg-cyan-400 hover:bg-cyan-300 text-slate-950 transition">
+              + Agregar tarea al tablero
+            </button>
+          </form>
+
+          <ul id="tasks-list" class="space-y-2.5" aria-label="Lista de tareas"></ul>
+        </div>
+
+        <!-- Columna derecha: Hábitos diarios + Temporizador Pomodoro (5 cols) -->
+        <div class="lg:col-span-5 space-y-6">
+          <!-- Temporizador Pomodoro integrado -->
+          <div class="rounded-2xl bg-panel border border-slate-800 p-5 sm:p-6 space-y-5">
+            <div class="flex items-center justify-between gap-2">
+              <div>
+                <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-emerald-400" aria-hidden="true"></span>
+                  Temporizador Pomodoro
+                </h2>
+                <p id="pomo-mode-label" class="text-xs text-slate-400">Enfoque profundo de 25 minutos</p>
+              </div>
+              <div class="text-right">
+                <span class="block text-[11px] text-slate-400">Sesiones hoy</span>
+                <span id="pomo-sessions-count" class="font-mono text-base font-bold text-emerald-400 tabular-nums">0</span>
+              </div>
+            </div>
+
+            <!-- Selector de modos Pomodoro -->
+            <div role="tablist" aria-label="Modos del temporizador Pomodoro" class="grid grid-cols-3 gap-1.5 bg-carbon p-1 rounded-xl border border-slate-800">
+              <button type="button" data-pomo-mode="pomodoro" class="pomo-mode-btn py-2 px-2 rounded-lg text-xs font-semibold bg-emerald-400/15 text-emerald-300 border border-emerald-400/35 transition">
+                Pomodoro 25m
+              </button>
+              <button type="button" data-pomo-mode="shortBreak" class="pomo-mode-btn py-2 px-2 rounded-lg text-xs font-semibold text-slate-400 hover:text-white border border-transparent transition">
+                Corto 5m
+              </button>
+              <button type="button" data-pomo-mode="longBreak" class="pomo-mode-btn py-2 px-2 rounded-lg text-xs font-semibold text-slate-400 hover:text-white border border-transparent transition">
+                Largo 15m
+              </button>
+            </div>
+
+            <!-- Pantalla del cronómetro y barra de progreso -->
+            <div class="rounded-2xl bg-carbon border border-slate-800/90 p-5 text-center space-y-3">
+              <div id="pomo-display" class="font-mono text-5xl sm:text-6xl font-bold text-white tracking-tight tabular-nums">25:00</div>
+              <div class="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+                <div id="pomo-progress-bar" class="h-full bg-gradient-to-r from-emerald-400 to-cyan-400 transition-all duration-500 w-full"></div>
+              </div>
+              <p id="pomo-status-text" class="text-xs text-slate-400">Listo para iniciar</p>
+            </div>
+
+            <!-- Controles Iniciar, Pausar, Reiniciar -->
+            <div class="grid grid-cols-3 gap-2.5">
+              <button id="pomo-start-btn" type="button" class="py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold bg-emerald-400 hover:bg-emerald-300 text-slate-950 transition">
+                Iniciar
+              </button>
+              <button id="pomo-pause-btn" type="button" class="py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold bg-amber-400/15 hover:bg-amber-400/25 text-amber-300 border border-amber-400/35 transition">
+                Pausar
+              </button>
+              <button id="pomo-reset-btn" type="button" class="py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 transition">
+                Reiniciar
+              </button>
+            </div>
+          </div>
+
+          <!-- Seguimiento de hábitos diarios -->
+          <div class="rounded-2xl bg-panel border border-slate-800 p-5 sm:p-6 space-y-4">
+            <div class="flex items-center justify-between gap-2">
+              <div>
+                <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-cyan-400" aria-hidden="true"></span>
+                  Hábitos diarios
+                </h2>
+                <p class="text-xs text-slate-400">Constancia diaria con contador de racha.</p>
+              </div>
+              <span id="habits-summary-badge" class="font-mono text-xs font-semibold px-2.5 py-1 rounded-full bg-cyan-400/10 text-cyan-300 border border-cyan-400/25 tabular-nums">
+                0 / 0 hoy
+              </span>
+            </div>
+
+            <form id="habit-form" class="flex gap-2">
+              <label for="habit-input" class="sr-only">Agregar hábito personalizado</label>
+              <input
+                id="habit-input"
+                type="text"
+                required
+                placeholder="Nuevo hábito (ej. Repasar vocabulario 15m)"
+                class="flex-1 rounded-xl bg-carbon border border-slate-700/80 px-3.5 py-2 text-xs sm:text-sm text-white placeholder-slate-500 focus:border-cyan-400 transition"
+              />
+              <button type="submit" class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-cyan-400 hover:bg-cyan-300 text-slate-950 transition shrink-0">
+                + Hábito
+              </button>
+            </form>
+
+            <ul id="habits-list" class="space-y-2.5" aria-label="Seguimiento de hábitos diarios"></ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =====================================================================
+         MÓDULO 3: GENERADOR DE TARJETAS DE REPASO (FLASHCARDS)
+         ===================================================================== -->
+    <section id="view-flashcards" role="tabpanel" aria-labelledby="tab-flashcards" class="hidden space-y-6">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 rounded-2xl bg-panel border border-slate-800 p-5 sm:p-6">
+        <div>
+          <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-400/10 text-amber-300 border border-amber-400/25 mb-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+            Memoria Activa y Autoevaluación
+          </div>
+          <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">Generador de Tarjetas de Repaso</h1>
+          <p class="text-xs sm:text-sm text-slate-400 mt-0.5">Crea mazos de estudio o vocabulario, añade tarjetas y evalúa tu dominio con repetición activa.</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Panel izquierdo: Mazos y creación de tarjetas (5 cols) -->
+        <div class="lg:col-span-5 space-y-6">
+          <!-- Crear y seleccionar mazo -->
+          <div class="rounded-2xl bg-panel border border-slate-800 p-5 sm:p-6 space-y-4">
+            <div class="flex items-center justify-between gap-2">
+              <h2 class="text-lg font-bold text-white">Mazos de estudio</h2>
+              <button id="delete-deck-btn" type="button" class="text-xs font-medium text-rose-300 hover:text-rose-200 px-2.5 py-1 rounded-lg bg-rose-950/40 border border-rose-500/25 transition">
+                Eliminar mazo
+              </button>
+            </div>
+
+            <form id="deck-form" class="flex gap-2">
+              <label for="deck-name-input" class="sr-only">Nombre del nuevo mazo</label>
+              <input
+                id="deck-name-input"
+                type="text"
+                required
+                placeholder="Nuevo mazo (ej. Inglés B2 - Phrasal Verbs)"
+                class="flex-1 rounded-xl bg-carbon border border-slate-700/80 px-3.5 py-2 text-xs sm:text-sm text-white placeholder-slate-500 focus:border-amber-400 transition"
+              />
+              <button type="submit" class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-amber-400 hover:bg-amber-300 text-slate-950 transition shrink-0">
+                + Mazo
+              </button>
+            </form>
+
+            <div id="decks-list" class="flex flex-wrap gap-2" aria-label="Mazos disponibles"></div>
+          </div>
+
+          <!-- Añadir tarjeta al mazo activo -->
+          <div class="rounded-2xl bg-panel border border-slate-800 p-5 sm:p-6 space-y-4">
+            <div>
+              <h2 class="text-lg font-bold text-white">Añadir tarjeta al mazo</h2>
+              <p id="active-deck-subtitle" class="text-xs text-slate-400">Mazo activo: —</p>
+            </div>
+
+            <form id="card-form" class="space-y-3">
+              <div>
+                <label for="card-front" class="block text-xs font-semibold text-slate-300 mb-1">Pregunta / Frente</label>
+                <textarea
+                  id="card-front"
+                  rows="2"
+                  required
+                  placeholder="Ej. ¿Qué significa 'To keep up with'?"
+                  class="w-full rounded-xl bg-carbon border border-slate-700/80 px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:border-amber-400 transition"
+                ></textarea>
+              </div>
+              <div>
+                <label for="card-back" class="block text-xs font-semibold text-slate-300 mb-1">Respuesta / Reverso</label>
+                <textarea
+                  id="card-back"
+                  rows="3"
+                  required
+                  placeholder="Ej. Mantener el ritmo de algo o estar al día con novedades/personas."
+                  class="w-full rounded-xl bg-carbon border border-slate-700/80 px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:border-amber-400 transition"
+                ></textarea>
+              </div>
+              <button type="submit" class="w-full py-2.5 px-4 rounded-xl text-sm font-semibold bg-amber-400 hover:bg-amber-300 text-slate-950 transition">
+                + Guardar tarjeta
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Panel derecho: Modo de autoevaluación interactivo y estadísticas (7 cols) -->
+        <div class="lg:col-span-7 rounded-2xl bg-panel border border-slate-800 p-5 sm:p-6 space-y-5">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h2 class="text-lg font-bold text-white">Modo de autoevaluación</h2>
+              <p id="study-counter-label" class="text-xs text-slate-400 tabular-nums">Tarjeta 0 de 0</p>
+            </div>
+
+            <!-- Estadísticas de dominio del mazo -->
+            <div id="deck-stats-pills" class="flex flex-wrap items-center gap-2 text-xs font-mono tabular-nums">
+              <span class="px-2.5 py-1 rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/30">Nuevas/Repasar: <strong id="stat-again">0</strong></span>
+              <span class="px-2.5 py-1 rounded-full bg-amber-400/15 text-amber-300 border border-amber-400/30">Difícil: <strong id="stat-hard">0</strong></span>
+              <span class="px-2.5 py-1 rounded-full bg-emerald-400/15 text-emerald-300 border border-emerald-400/30">Dominada: <strong id="stat-mastered">0</strong></span>
+            </div>
+          </div>
+
+          <!-- Barra de progreso de dominio -->
+          <div class="space-y-1.5">
+            <div class="flex justify-between text-xs text-slate-400 tabular-nums">
+              <span>Dominio del mazo</span>
+              <span id="deck-mastery-percent">0%</span>
+            </div>
+            <div class="w-full h-2.5 rounded-full bg-carbon overflow-hidden border border-slate-800">
+              <div id="deck-mastery-bar" class="h-full bg-gradient-to-r from-amber-400 via-cyan-400 to-emerald-400 transition-all duration-300 w-0"></div>
+            </div>
+          </div>
+
+          <!-- Escena 3D de la Flashcard -->
+          <div class="flashcard-scene">
+            <div id="flashcard-inner" class="flashcard-inner">
+              <!-- Frente -->
+              <div class="flashcard-face rounded-2xl bg-gradient-to-br from-carbon to-surface border border-slate-700/80 p-6 sm:p-8 flex flex-col justify-between min-h-[270px]">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-xs font-bold uppercase tracking-wider text-amber-400">Frente • Pregunta</span>
+                  <span id="card-status-badge" class="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300">Sin evaluar</span>
+                </div>
+                <div class="my-6 text-center">
+                  <p id="card-front-text" class="text-xl sm:text-2xl font-bold text-white leading-snug">No hay tarjetas en este mazo todavía.</p>
+                </div>
+                <div class="flex items-center justify-between text-xs text-slate-400">
+                  <span>Haz clic en "Voltear tarjeta" para ver la respuesta</span>
+                  <button id="delete-current-card-btn" type="button" class="text-rose-300/80 hover:text-rose-300 transition">Borrar tarjeta</button>
+                </div>
+              </div>
+
+              <!-- Reverso -->
+              <div class="flashcard-face flashcard-back absolute inset-0 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-950 border border-cyan-400/40 p-6 sm:p-8 flex flex-col justify-between min-h-[270px]">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-xs font-bold uppercase tracking-wider text-cyan-400">Reverso • Respuesta</span>
+                  <span class="text-[11px] text-slate-400">Autoevalúa tu recall</span>
+                </div>
+                <div class="my-6 text-center overflow-y-auto max-h-36">
+                  <p id="card-back-text" class="text-base sm:text-xl font-medium text-slate-100 leading-relaxed">—</p>
+                </div>
+                <div class="text-center text-xs text-cyan-300/80">
+                  Elige abajo cómo te resultó recordar esta tarjeta
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Navegación y volteo -->
+          <div class="flex flex-wrap items-center justify-between gap-2.5">
+            <button id="prev-card-btn" type="button" class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-carbon hover:bg-slate-800 text-slate-200 border border-slate-700/80 transition">
+              ← Anterior
+            </button>
+
+            <button id="flip-card-btn" type="button" class="flex-1 sm:flex-initial px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-cyan-400 hover:bg-cyan-300 text-slate-950 shadow-md shadow-cyan-500/15 transition">
+              Voltear tarjeta
+            </button>
+
+            <button id="next-card-btn" type="button" class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-carbon hover:bg-slate-800 text-slate-200 border border-slate-700/80 transition">
+              Siguiente →
+            </button>
+          </div>
+
+          <!-- Calificación de dominio -->
+          <div class="pt-2 border-t border-slate-800/90 space-y-2.5">
+            <p class="text-xs font-semibold text-slate-300 text-center">Califica tu nivel de dominio en esta tarjeta:</p>
+            <div class="grid grid-cols-3 gap-2.5">
+              <button id="rate-again-btn" type="button" class="py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/35 transition">
+                Repasar de nuevo
+              </button>
+              <button id="rate-hard-btn" type="button" class="py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold bg-amber-400/15 hover:bg-amber-400/25 text-amber-300 border border-amber-400/35 transition">
+                Difícil
+              </button>
+              <button id="rate-mastered-btn" type="button" class="py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold bg-emerald-400/15 hover:bg-emerald-400/25 text-emerald-300 border border-emerald-400/35 transition">
+                Dominada
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="border-t border-slate-900 bg-slate-950/70 py-4 px-4 sm:px-6 text-center text-xs text-slate-500">
+    NexoEstudio • Datos persistidos localmente en tu navegador (<span class="font-mono text-slate-400">localStorage</span>). Sin dependencias externas de audio ni imágenes.
+  </footer>
+
+  <script>
+    /**
+     * =========================================================================
+     * NEXOESTUDIO — APLICACIÓN DE PRODUCTIVIDAD Y ESTUDIO
+     * Arquitectura de estado centralizado con persistencia en localStorage,
+     * síntesis de sonido con Web Audio API (sin URLs externas) y renderizado
+     * reactivo con escapado seguro de HTML.
+     * =========================================================================
+     */
+
+    const STORAGE_KEY = 'nexoestudio_v1_state';
+
+    // Utilidad de fecha local YYYY-MM-DD para rachas de hábitos y sesiones diarias
+    function getTodayISO() {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    function getYesterdayISO() {
+      const y = new Date();
+      y.setDate(y.getDate() - 1);
+      const year = y.getFullYear();
+      const month = String(y.getMonth() + 1).padStart(2, '0');
+      const day = String(y.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    // Escapado HTML para evitar inyección en textos ingresados por el usuario
+    function escapeHTML(str = '') {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    // Normalización segura de URLs para enlaces rápidos
+    function normalizeURL(rawUrl = '') {
+      const trimmed = rawUrl.trim();
+      if (!trimmed) return '';
+      const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+      try {
+        const parsed = new URL(withProtocol);
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+          return parsed.href;
+        }
+        return '';
+      } catch {
+        return '';
+      }
+    }
+
+    // Datos iniciales de ejemplo ricos y fáciles de editar o limpiar
+    function createDemoState() {
+      const today = getTodayISO();
+      const yesterday = getYesterdayISO();
+
+      return {
+        activeTab: 'dashboard',
+        reminders: [
+          { id: 'rem-1', text: 'Revisar el temario de examen antes de las 19:00', done: false },
+          { id: 'rem-2', text: 'Preparar mochila y botella de agua para mañana', done: true },
+          { id: 'rem-3', text: 'Subir resumen de lectura a la carpeta del curso', done: false }
+        ],
+        quickNote:
+          '• Prioridad del día: completar 2 bloques Pomodoro en Estadística.\n• Idea para ensayo: contrastar memoria a corto plazo vs. evocación activa.\n• Recordar repasar el mazo de Inglés antes de dormir.',
+        shortcuts: [
+          { id: 'sc-1', title: 'Wikipedia', url: 'https://es.wikipedia.org', tag: 'Consulta' },
+          { id: 'sc-2', title: 'MDN Web Docs', url: 'https://developer.mozilla.org/es/', tag: 'Desarrollo' },
+          { id: 'sc-3', title: 'Khan Academy', url: 'https://es.khanacademy.org', tag: 'Estudio' },
+          { id: 'sc-4', title: 'Google Calendar', url: 'https://calendar.google.com', tag: 'Agenda' }
+        ],
+        tasks: [
+          {
+            id: 'tsk-1',
+            title: 'Resolver 12 ejercicios de distribuciones de probabilidad',
+            subject: 'Estadística',
+            priority: 'alta',
+            completed: false
+          },
+          {
+            id: 'tsk-2',
+            title: 'Subrayar capítulo 4 sobre métodos de investigación',
+            subject: 'Metodología',
+            priority: 'media',
+            completed: false
+          },
+          {
+            id: 'tsk-3',
+            title: 'Organizar apuntes de clase en limpio',
+            subject: 'Historia',
+            priority: 'baja',
+            completed: true
+          }
+        ],
+        habits: [
+          { id: 'hab-1', name: 'Leer 20 páginas', streak: 4, lastCompletedDate: yesterday },
+          { id: 'hab-2', name: 'Hidratarte (2L de agua)', streak: 6, lastCompletedDate: today },
+          { id: 'hab-3', name: 'Entrenar / Mover el cuerpo', streak: 3, lastCompletedDate: yesterday }
+        ],
+        pomodoro: {
+          mode: 'pomodoro', // 'pomodoro' | 'shortBreak' | 'longBreak'
+          remainingSeconds: 25 * 60,
+          isRunning: false,
+          sessionsToday: 1,
+          sessionsDate: today
+        },
+        flashcards: {
+          activeDeckId: 'deck-1',
+          currentCardIndex: 0,
+          isFlipped: false,
+          decks: [
+            {
+              id: 'deck-1',
+              name: 'Técnicas de Estudio y Cognición',
+              cards: [
+                {
+                  id: 'c-1',
+                  front: '¿Qué es la práctica de recuperación (retrieval practice)?',
+                  back: 'Intentar recordar información desde la memoria sin mirar los apuntes; fortalece la retención mucho más que releer.',
+                  rating: 'mastered'
+                },
+                {
+                  id: 'c-2',
+                  front: '¿En qué consiste el efecto espaciado?',
+                  back: 'Distribuir las sesiones de repaso en el tiempo en lugar de concentrarlas en una sola maratón previa al examen.',
+                  rating: 'hard'
+                },
+                {
+                  id: 'c-3',
+                  front: '¿Cuál es el propósito de la técnica Feynman?',
+                  back: 'Explicar un concepto con palabras sencillas como si enseñaras a otra persona para detectar vacíos de comprensión.',
+                  rating: 'again'
+                }
+              ]
+            },
+            {
+              id: 'deck-2',
+              name: 'Vocabulario — Productividad (EN/ES)',
+              cards: [
+                {
+                  id: 'c-4',
+                  front: 'Trade-off',
+                  back: 'Compensación o renuncia necesaria al elegir una opción sobre otra.',
+                  rating: 'again'
+                },
+                {
+                  id: 'c-5',
+                  front: 'Follow through',
+                  back: 'Llevar a cabo o completar algo que se había planeado o iniciado.',
+                  rating: 'mastered'
+                }
+              ]
+            }
+          ]
+        }
+      };
+    }
+
+    // Estado en memoria
+    let state = loadState();
+    let pomodoroInterval = null;
+    let toastTimeout = null;
+    let notesSaveTimeout = null;
+    let taskFilter = 'all';
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return createDemoState();
+        const parsed = JSON.parse(raw);
+        const fallback = createDemoState();
+
+        const merged = {
+          ...fallback,
+          ...parsed,
+          pomodoro: { ...fallback.pomodoro, ...(parsed.pomodoro || {}) },
+          flashcards: {
+            ...fallback.flashcards,
+            ...(parsed.flashcards || {}),
+            decks: Array.isArray(parsed.flashcards?.decks) ? parsed.flashcards.decks : fallback.flashcards.decks
+          }
+        };
+
+        // Reiniciar contador de sesiones diarias si cambió el día
+        const today = getTodayISO();
+        if (merged.pomodoro.sessionsDate !== today) {
+          merged.pomodoro.sessionsToday = 0;
+          merged.pomodoro.sessionsDate = today;
+        }
+
+        // Nunca arrancar un intervalo activo al recargar la página
+        merged.pomodoro.isRunning = false;
+        return merged;
+      } catch (err) {
+        console.error('Error al cargar estado de localStorage:', err);
+        return createDemoState();
+      }
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } catch (err) {
+        console.error('Error al guardar estado en localStorage:', err);
+        showToast('No se pudo guardar en localStorage (espacio lleno o restringido).', 'error');
+      }
+    }
+
+    // Notificación visual tipo toast (sin alert())
+    function showToast(message, type = 'info') {
+      const banner = document.getElementById('toast-banner');
+      const content = document.getElementById('toast-content');
+      const dot = document.getElementById('toast-dot');
+      const textEl = document.getElementById('toast-message');
+
+      textEl.textContent = message;
+
+      content.className = 'pointer-events-auto rounded-2xl border bg-slate-900/95 backdrop-blur-md px-4 py-3 shadow-2xl flex items-center justify-between gap-3';
+      dot.className = 'w-2.5 h-2.5 rounded-full shrink-0';
+
+      if (type === 'success') {
+        content.classList.add('border-emerald-400/45');
+        dot.classList.add('bg-emerald-400');
+      } else if (type === 'error') {
+        content.classList.add('border-rose-500/45');
+        dot.classList.add('bg-rose-400');
+      } else if (type === 'warning') {
+        content.classList.add('border-amber-400/45');
+        dot.classList.add('bg-amber-400');
+      } else {
+        content.classList.add('border-cyan-400/45');
+        dot.classList.add('bg-cyan-400');
+      }
+
+      banner.classList.remove('opacity-0', 'translate-y-3', 'pointer-events-none');
+      banner.classList.add('opacity-100', 'translate-y-0');
+
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        hideToast();
+      }, 3600);
+    }
+
+    function hideToast() {
+      const banner = document.getElementById('toast-banner');
+      banner.classList.add('opacity-0', 'translate-y-3', 'pointer-events-none');
+      banner.classList.remove('opacity-100', 'translate-y-0');
+    }
+
+    // Alerta sonora suave generada con Web Audio API (sin archivos externos)
+    function playGentleChime() {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const notes = [523.25, 659.25, 783.99]; // Do5, Mi5, Sol5
+        notes.forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.16);
+
+          gain.gain.setValueAtTime(0.0001, ctx.currentTime + idx * 0.16);
+          gain.gain.exponentialRampToValueAtTime(0.08, ctx.currentTime + idx * 0.16 + 0.04);
+          gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + idx * 0.16 + 0.55);
+
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(ctx.currentTime + idx * 0.16);
+          osc.stop(ctx.currentTime + idx * 0.16 + 0.6);
+        });
+      } catch (err) {
+        console.warn('AudioContext no disponible:', err);
+      }
+    }
+
+    /* =========================================================================
+       RELOJ EN TIEMPO REAL Y FECHA
+       ========================================================================= */
+    function updateClockAndGreeting() {
+      const now = new Date();
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const seconds = String(now.getSeconds()).padStart(2, '0');
+      const formattedTime = `${hours}:${minutes}:${seconds}`;
+
+      const formattedDate = now.toLocaleDateString('es-ES', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      });
+
+      const headerClock = document.getElementById('header-clock');
+      const headerDate = document.getElementById('header-date');
+      const heroClock = document.getElementById('hero-clock');
+      const heroDate = document.getElementById('hero-date');
+      const greetingTitle = document.getElementById('greeting-title');
+
+      if (headerClock) headerClock.textContent = formattedTime;
+      if (headerDate) headerDate.textContent = formattedDate;
+      if (heroClock) heroClock.textContent = formattedTime;
+      if (heroDate) heroDate.textContent = formattedDate;
+
+      let saludo = '¡Hola! Listo para avanzar hoy';
+      const h = now.getHours();
+      if (h >= 5 && h < 12) saludo = '¡Buenos días! Gran momento para enfocar';
+      else if (h >= 12 && h < 20) saludo = '¡Buenas tardes! Mantén el ritmo de estudio';
+      else saludo = '¡Buenas noches! Cierra el día con calma';
+
+      if (greetingTitle) greetingTitle.textContent = saludo;
+    }
+
+    /* =========================================================================
+       NAVEGACIÓN ENTRE PESTAÑAS
+       ========================================================================= */
+    function setActiveTab(tabName) {
+      state.activeTab = tabName;
+      saveState();
+
+      const tabs = document.querySelectorAll('.nav-tab');
+      tabs.forEach((btn) => {
+        const isCurrent = btn.dataset.tab === tabName;
+        btn.setAttribute('aria-selected', String(isCurrent));
+        if (isCurrent) {
+          btn.className = 'nav-tab flex-1 sm:flex-initial whitespace-nowrap px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 bg-cyan-400/15 text-cyan-300 border border-cyan-400/40 shadow-sm';
+        } else {
+          btn.className = 'nav-tab flex-1 sm:flex-initial whitespace-nowrap px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-2 text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 border border-transparent';
+        }
+      });
+
+      document.getElementById('view-dashboard').classList.toggle('hidden', tabName !== 'dashboard');
+      document.getElementById('view-tasks').classList.toggle('hidden', tabName !== 'tasks');
+      document.getElementById('view-flashcards').classList.toggle('hidden', tabName !== 'flashcards');
+    }
+
+    /* =========================================================================
+       MÓDULO 1: DASHBOARD (RECORDATORIOS, NOTAS RÁPIDAS, ENLACES, RESUMEN)
+       ========================================================================= */
+    function renderDashboardSummary() {
+      const today = getTodayISO();
+      const pendingReminders = state.reminders.filter((r) => !r.done).length;
+      const habitsDoneToday = state.habits.filter((h) => h.lastCompletedDate === today).length;
+      const pendingTasks = state.tasks.filter((t) => !t.completed).length;
+
+      document.getElementById('dash-reminders-pending').textContent = String(pendingReminders);
+      document.getElementById('dash-habits-done').textContent = `${habitsDoneToday}/${state.habits.length}`;
+      document.getElementById('dash-tasks-pending').textContent = String(pendingTasks);
+      document.getElementById('dash-pomo-count').textContent = String(state.pomodoro.sessionsToday);
+    }
+
+    function renderReminders() {
+      const listEl = document.getElementById('reminders-list');
+      if (!state.reminders.length) {
+        listEl.innerHTML = `<li class="rounded-xl bg-carbon/60 border border-dashed border-slate-800 p-4 text-center text-xs sm:text-sm text-slate-400">No hay recordatorios para hoy. Añade uno arriba.</li>`;
+        renderDashboardSummary();
+        return;
+      }
+
+      listEl.innerHTML = state.reminders
+        .map(
+          (rem) => `
+          <li class="group flex items-center justify-between gap-3 rounded-xl bg-carbon border ${rem.done ? 'border-slate-800/60 opacity-70' : 'border-slate-800 hover:border-cyan-400/35'} px-3.5 py-2.5 transition">
+            <label class="flex items-center gap-3 flex-1 cursor-pointer min-w-0">
+              <input
+                type="checkbox"
+                ${rem.done ? 'checked' : ''}
+                onchange="toggleReminder('${rem.id}')"
+                class="w-4 h-4 rounded accent-cyan-400 cursor-pointer shrink-0"
+              />
+              <span class="text-xs sm:text-sm break-words ${rem.done ? 'line-through text-slate-500' : 'text-slate-100'}">${escapeHTML(rem.text)}</span>
+            </label>
+            <button
+              type="button"
+              onclick="deleteReminder('${rem.id}')"
+              aria-label="Eliminar recordatorio"
+              class="text-slate-500 hover:text-rose-400 text-xs px-2 py-1 rounded-lg hover:bg-rose-950/40 transition shrink-0">
+              ✕
+            </button>
+          </li>`
+        )
+        .join('');
+
+      renderDashboardSummary();
+    }
+
+    function toggleReminder(id) {
+      state.reminders = state.reminders.map((r) => (r.id === id ? { ...r, done: !r.done } : r));
+      saveState();
+      renderReminders();
+    }
+
+    function deleteReminder(id) {
+      state.reminders = state.reminders.filter((r) => r.id !== id);
+      saveState();
+      renderReminders();
+      showToast('Recordatorio eliminado.', 'info');
+    }
+
+    function renderQuickNotes() {
+      const textarea = document.getElementById('quick-notes-textarea');
+      const countEl = document.getElementById('notes-char-count');
+      if (textarea.value !== state.quickNote) {
+        textarea.value = state.quickNote;
+      }
+      countEl.textContent = `${state.quickNote.length} caracteres`;
+    }
+
+    function renderShortcuts() {
+      const container = document.getElementById('shortcuts-list');
+      if (!state.shortcuts.length) {
+        container.innerHTML = `<p class="sm:col-span-2 rounded-xl bg-carbon/60 border border-dashed border-slate-800 p-4 text-center text-xs sm:text-sm text-slate-400">Agrega tus enlaces frecuentes para abrirlos en una nueva pestaña.</p>`;
+        return;
+      }
+
+      container.innerHTML = state.shortcuts
+        .map((sc) => {
+          let host = sc.url;
+          try {
+            host = new URL(sc.url).hostname.replace(/^www\./, '');
+          } catch {}
+          return `
+            <div class="flex items-center justify-between gap-2 rounded-xl bg-carbon border border-slate-800 hover:border-emerald-400/40 px-3 py-2.5 transition">
+              <a
+                href="${escapeHTML(sc.url)}"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="min-w-0 flex-1 group">
+                <div class="text-xs sm:text-sm font-semibold text-white group-hover:text-emerald-300 truncate transition flex items-center gap-1.5">
+                  <span class="truncate">${escapeHTML(sc.title)}</span>
+                  <span class="text-[11px] text-emerald-400 shrink-0" aria-hidden="true">↗</span>
+                </div>
+                <div class="text-[11px] text-slate-400 truncate">${escapeHTML(host)}</div>
+              </a>
+              <button
+                type="button"
+                onclick="deleteShortcut('${sc.id}')"
+                aria-label="Eliminar enlace ${escapeHTML(sc.title)}"
+                class="text-slate-500 hover:text-rose-400 text-xs px-1.5 py-1 rounded-lg hover:bg-rose-950/40 transition shrink-0">
+                ✕
+              </button>
+            </div>`;
+        })
+        .join('');
+    }
+
+    function deleteShortcut(id) {
+      state.shortcuts = state.shortcuts.filter((s) => s.id !== id);
+      saveState();
+      renderShortcuts();
+      showToast('Acceso directo eliminado.', 'info');
+    }
+
+    /* =========================================================================
+       MÓDULO 2: TAREAS, HÁBITOS DIARIOS Y TEMPORIZADOR POMODORO
+       ========================================================================= */
+    function renderTasks() {
+      const listEl = document.getElementById('tasks-list');
+      const filtered = state.tasks.filter((t) => {
+        if (taskFilter === 'pending') return !t.completed;
+        if (taskFilter === 'completed') return t.completed;
+        return true;
+      });
+
+      if (!filtered.length) {
+        const msg =
+          taskFilter === 'completed'
+            ? 'No hay tareas completadas con este filtro.'
+            : taskFilter === 'pending'
+            ? '¡Todo al día! No tienes tareas pendientes.'
+            : 'Aún no has agregado tareas. Crea tu primera tarea arriba.';
+        listEl.innerHTML = `<li class="rounded-xl bg-carbon/60 border border-dashed border-slate-800 p-5 text-center text-xs sm:text-sm text-slate-400">${msg}</li>`;
+        renderDashboardSummary();
+        return;
+      }
+
+      const priorityMeta = {
+        alta: { label: 'Alta', cls: 'bg-rose-500/15 text-rose-300 border-rose-500/35' },
+        media: { label: 'Media', cls: 'bg-amber-400/15 text-amber-300 border-amber-400/35' },
+        baja: { label: 'Baja', cls: 'bg-cyan-400/15 text-cyan-300 border-cyan-400/35' }
+      };
+
+      listEl.innerHTML = filtered
+        .map((t) => {
+          const p = priorityMeta[t.priority] || priorityMeta.media;
+          return `
+            <li class="flex items-start sm:items-center justify-between gap-3 rounded-xl bg-carbon border ${t.completed ? 'border-slate-800/60 opacity-75' : 'border-slate-800 hover:border-cyan-400/35'} p-3.5 transition">
+              <label class="flex items-start sm:items-center gap-3 flex-1 cursor-pointer min-w-0">
+                <input
+                  type="checkbox"
+                  ${t.completed ? 'checked' : ''}
+                  onchange="toggleTask('${t.id}')"
+                  class="mt-0.5 sm:mt-0 w-4 h-4 rounded accent-emerald-400 cursor-pointer shrink-0"
+                />
+                <div class="min-w-0 flex-1">
+                  <div class="text-sm font-medium break-words ${t.completed ? 'line-through text-slate-500' : 'text-white'}">${escapeHTML(t.title)}</div>
+                  <div class="flex flex-wrap items-center gap-2 mt-1">
+                    <span class="text-[11px] font-semibold px-2 py-0.5 rounded-md border ${p.cls}">Prioridad ${p.label}</span>
+                    ${t.subject ? `<span class="text-[11px] px-2 py-0.5 rounded-md bg-slate-800/90 text-slate-300">${escapeHTML(t.subject)}</span>` : ''}
+                  </div>
+                </div>
+              </label>
+              <button
+                type="button"
+                onclick="deleteTask('${t.id}')"
+                aria-label="Eliminar tarea"
+                class="text-slate-500 hover:text-rose-400 text-xs px-2 py-1.5 rounded-lg hover:bg-rose-950/40 transition shrink-0">
+                ✕
+              </button>
+            </li>`;
+        })
+        .join('');
+
+      renderDashboardSummary();
+    }
+
+    function toggleTask(id) {
+      state.tasks = state.tasks.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t));
+      saveState();
+      renderTasks();
+    }
+
+    function deleteTask(id) {
+      state.tasks = state.tasks.filter((t) => t.id !== id);
+      saveState();
+      renderTasks();
+      showToast('Tarea eliminada.', 'info');
+    }
+
+    // Hábitos diarios con cálculo de racha y marcado diario
+    function renderHabits() {
+      const listEl = document.getElementById('habits-list');
+      const badgeEl = document.getElementById('habits-summary-badge');
+      const today = getTodayISO();
+
+      const doneCount = state.habits.filter((h) => h.lastCompletedDate === today).length;
+      badgeEl.textContent = `${doneCount} / ${state.habits.length} hoy`;
+
+      if (!state.habits.length) {
+        listEl.innerHTML = `<li class="rounded-xl bg-carbon/60 border border-dashed border-slate-800 p-4 text-center text-xs sm:text-sm text-slate-400">Añade un hábito diario como Leer, Hidratarte o Entrenar.</li>`;
+        renderDashboardSummary();
+        return;
+      }
+
+      listEl.innerHTML = state.habits
+        .map((hab) => {
+          const isDoneToday = hab.lastCompletedDate === today;
+          return `
+            <li class="flex items-center justify-between gap-3 rounded-xl bg-carbon border ${isDoneToday ? 'border-emerald-400/40 bg-emerald-950/15' : 'border-slate-800'} px-3.5 py-3 transition">
+              <div class="min-w-0 flex-1">
+                <div class="text-sm font-semibold ${isDoneToday ? 'text-emerald-200' : 'text-white'} truncate">${escapeHTML(hab.name)}</div>
+                <div class="text-[11px] text-slate-400 mt-0.5 flex items-center gap-2 tabular-nums">
+                  <span class="text-amber-300 font-medium">🔥 Racha: ${hab.streak} ${hab.streak === 1 ? 'día' : 'días'}</span>
+                  <span>•</span>
+                  <span>${isDoneToday ? 'Completado hoy' : 'Pendiente hoy'}</span>
+                </div>
+              </div>
+              <div class="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onclick="toggleHabitToday('${hab.id}')"
+                  aria-pressed="${isDoneToday}"
+                  class="px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                    isDoneToday
+                      ? 'bg-emerald-400 text-slate-950 hover:bg-emerald-300'
+                      : 'bg-slate-800 text-slate-200 hover:bg-emerald-400/20 hover:text-emerald-300 border border-slate-700'
+                  }">
+                  ${isDoneToday ? '✓ Hecho' : 'Marcar'}
+                </button>
+                <button
+                  type="button"
+                  onclick="deleteHabit('${hab.id}')"
+                  aria-label="Eliminar hábito ${escapeHTML(hab.name)}"
+                  class="text-slate-500 hover:text-rose-400 text-xs px-2 py-1.5 rounded-lg hover:bg-rose-950/40 transition">
+                  ✕
+                </button>
+              </div>
+            </li>`;
+        })
+        .join('');
+
+      renderDashboardSummary();
+    }
+
+    function toggleHabitToday(id) {
+      const today = getTodayISO();
+      const yesterday = getYesterdayISO();
+
+      state.habits = state.habits.map((hab) => {
+        if (hab.id !== id) return hab;
+
+        // Si ya estaba completado hoy, se desmarca y se ajusta la racha con seguridad
+        if (hab.lastCompletedDate === today) {
+          return {
+            ...hab,
+            lastCompletedDate: null,
+            streak: Math.max(0, (hab.streak || 1) - 1)
+          };
+        }
+
+        // Si se completó ayer, incrementa racha; si no, inicia racha en 1
+        const nextStreak = hab.lastCompletedDate === yesterday ? (hab.streak || 0) + 1 : 1;
+        return {
+          ...hab,
+          lastCompletedDate: today,
+          streak: nextStreak
+        };
+      });
+
+      saveState();
+      renderHabits();
+    }
+
+    function deleteHabit(id) {
+      state.habits = state.habits.filter((h) => h.id !== id);
+      saveState();
+      renderHabits();
+      showToast('Hábito eliminado.', 'info');
+    }
+
+    // Temporizador Pomodoro
+    const POMO_MODES = {
+      pomodoro: { seconds: 25 * 60, label: 'Enfoque profundo de 25 minutos' },
+      shortBreak: { seconds: 5 * 60, label: 'Descanso corto de 5 minutos' },
+      longBreak: { seconds: 15 * 60, label: 'Descanso largo de 15 minutos' }
+    };
+
+    function formatSecondsMMSS(totalSec) {
+      const safe = Math.max(0, Math.floor(totalSec));
+      const m = String(Math.floor(safe / 60)).padStart(2, '0');
+      const s = String(safe % 60).padStart(2, '0');
+      return `${m}:${s}`;
+    }
+
+    function renderPomodoro() {
+      const { mode, remainingSeconds, isRunning, sessionsToday } = state.pomodoro;
+      const totalModeSeconds = POMO_MODES[mode]?.seconds || 25 * 60;
+      const formatted = formatSecondsMMSS(remainingSeconds);
+
+      document.getElementById('pomo-display').textContent = formatted;
+      document.getElementById('quick-pomo-time').textContent = formatted;
+      document.getElementById('pomo-sessions-count').textContent = String(sessionsToday);
+      document.getElementById('pomo-mode-label').textContent = POMO_MODES[mode]?.label || '';
+
+      const pct = Math.max(0, Math.min(100, (remainingSeconds / totalModeSeconds) * 100));
+      document.getElementById('pomo-progress-bar').style.width = `${pct}%`;
+
+      const statusEl = document.getElementById('pomo-status-text');
+      if (isRunning) {
+        statusEl.textContent = mode === 'pomodoro' ? 'Sesión de enfoque activa...' : 'Tiempo de descanso en curso...';
+        statusEl.className = 'text-xs font-medium text-emerald-300';
+      } else if (remainingSeconds < totalModeSeconds) {
+        statusEl.textContent = 'Temporizador en pausa';
+        statusEl.className = 'text-xs font-medium text-amber-300';
+      } else {
+        statusEl.textContent = 'Listo para iniciar';
+        statusEl.className = 'text-xs text-slate-400';
+      }
+
+      document.querySelectorAll('.pomo-mode-btn').forEach((btn) => {
+        const active = btn.dataset.pomoMode === mode;
+        btn.className = active
+          ? 'pomo-mode-btn py-2 px-2 rounded-lg text-xs font-semibold bg-emerald-400/15 text-emerald-300 border border-emerald-400/35 transition'
+          : 'pomo-mode-btn py-2 px-2 rounded-lg text-xs font-semibold text-slate-400 hover:text-white border border-transparent transition';
+      });
+
+      renderDashboardSummary();
+    }
+
+    function startPomodoro() {
+      if (state.pomodoro.isRunning) return;
+      state.pomodoro.isRunning = true;
+      saveState();
+      renderPomodoro();
+
+      clearInterval(pomodoroInterval);
+      pomodoroInterval = setInterval(() => {
+        if (state.pomodoro.remainingSeconds > 1) {
+          state.pomodoro.remainingSeconds -= 1;
+          saveState();
+          renderPomodoro();
+        } else {
+          // Tiempo completado
+          clearInterval(pomodoroInterval);
+          pomodoroInterval = null;
+          state.pomodoro.isRunning = false;
+
+          const finishedMode = state.pomodoro.mode;
+          if (finishedMode === 'pomodoro') {
+            const today = getTodayISO();
+            if (state.pomodoro.sessionsDate !== today) {
+              state.pomodoro.sessionsToday = 0;
+              state.pomodoro.sessionsDate = today;
+            }
+            state.pomodoro.sessionsToday += 1;
+            // Pasar automáticamente a descanso corto
+            state.pomodoro.mode = 'shortBreak';
+            state.pomodoro.remainingSeconds = POMO_MODES.shortBreak.seconds;
+            showToast('¡Pomodoro completado! Tómate un descanso corto.', 'success');
+          } else {
+            state.pomodoro.mode = 'pomodoro';
+            state.pomodoro.remainingSeconds = POMO_MODES.pomodoro.seconds;
+            showToast('Descanso terminado. ¡Listo para otro bloque de enfoque!', 'info');
+          }
+
+          playGentleChime();
+          saveState();
+          renderPomodoro();
+        }
+      }, 1000);
+    }
+
+    function pausePomodoro() {
+      clearInterval(pomodoroInterval);
+      pomodoroInterval = null;
+      state.pomodoro.isRunning = false;
+      saveState();
+      renderPomodoro();
+    }
+
+    function resetPomodoro() {
+      clearInterval(pomodoroInterval);
+      pomodoroInterval = null;
+      state.pomodoro.isRunning = false;
+      state.pomodoro.remainingSeconds = POMO_MODES[state.pomodoro.mode]?.seconds || 25 * 60;
+      saveState();
+      renderPomodoro();
+    }
+
+    function selectPomodoroMode(mode) {
+      if (!POMO_MODES[mode]) return;
+      clearInterval(pomodoroInterval);
+      pomodoroInterval = null;
+      state.pomodoro.mode = mode;
+      state.pomodoro.isRunning = false;
+      state.pomodoro.remainingSeconds = POMO_MODES[mode].seconds;
+      saveState();
+      renderPomodoro();
+    }
+
+    /* =========================================================================
+       MÓDULO 3: GENERADOR DE TARJETAS DE REPASO (FLASHCARDS)
+       ========================================================================= */
+    function getActiveDeck() {
+      if (!state.flashcards.decks.length) return null;
+      let deck = state.flashcards.decks.find((d) => d.id === state.flashcards.activeDeckId);
+      if (!deck) {
+        deck = state.flashcards.decks[0];
+        state.flashcards.activeDeckId = deck.id;
+      }
+      return deck;
+    }
+
+    function renderFlashcardsModule() {
+      const decksListEl = document.getElementById('decks-list');
+      const activeDeck = getActiveDeck();
+
+      // Renderizar lista de mazos
+      if (!state.flashcards.decks.length) {
+        decksListEl.innerHTML = `<p class="text-xs text-slate-400">No hay mazos. Crea uno arriba para comenzar.</p>`;
+      } else {
+        decksListEl.innerHTML = state.flashcards.decks
+          .map((d) => {
+            const isActive = activeDeck && d.id === activeDeck.id;
+            return `
+              <button
+                type="button"
+                onclick="selectDeck('${d.id}')"
+                class="px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-2 ${
+                  isActive
+                    ? 'bg-amber-400 text-slate-950 shadow-sm'
+                    : 'bg-carbon text-slate-300 hover:bg-slate-800 border border-slate-700/80'
+                }">
+                <span>${escapeHTML(d.name)}</span>
+                <span class="font-mono text-[11px] px-1.5 py-0.2 rounded-full ${isActive ? 'bg-slate-950/20 text-slate-950' : 'bg-slate-800 text-slate-400'}">${d.cards.length}</span>
+              </button>`;
+          })
+          .join('');
+      }
+
+      const subtitleEl = document.getElementById('active-deck-subtitle');
+      const counterEl = document.getElementById('study-counter-label');
+      const frontTextEl = document.getElementById('card-front-text');
+      const backTextEl = document.getElementById('card-back-text');
+      const statusBadgeEl = document.getElementById('card-status-badge');
+      const innerEl = document.getElementById('flashcard-inner');
+
+      if (!activeDeck) {
+        subtitleEl.textContent = 'Mazo activo: Ninguno';
+        counterEl.textContent = 'Tarjeta 0 de 0';
+        frontTextEl.textContent = 'Crea un mazo para empezar a estudiar.';
+        backTextEl.textContent = '—';
+        statusBadgeEl.textContent = 'Sin mazo';
+        innerEl.classList.remove('is-flipped');
+        updateDeckStats(null);
+        return;
+      }
+
+      subtitleEl.textContent = `Mazo activo: ${activeDeck.name}`;
+      updateDeckStats(activeDeck);
+
+      const cards = activeDeck.cards;
+      if (!cards.length) {
+        state.flashcards.currentCardIndex = 0;
+        state.flashcards.isFlipped = false;
+        innerEl.classList.remove('is-flipped');
+        counterEl.textContent = 'Tarjeta 0 de 0';
+        frontTextEl.textContent = 'Este mazo aún no tiene tarjetas. ¡Añade la primera en el panel izquierdo!';
+        backTextEl.textContent = '—';
+        statusBadgeEl.textContent = 'Vacío';
+        return;
+      }
+
+      if (state.flashcards.currentCardIndex >= cards.length) {
+        state.flashcards.currentCardIndex = 0;
+      }
+      if (state.flashcards.currentCardIndex < 0) {
+        state.flashcards.currentCardIndex = cards.length - 1;
+      }
+
+      const card = cards[state.flashcards.currentCardIndex];
+      counterEl.textContent = `Tarjeta ${state.flashcards.currentCardIndex + 1} de ${cards.length}`;
+      frontTextEl.textContent = card.front;
+      backTextEl.textContent = card.back;
+
+      innerEl.classList.toggle('is-flipped', Boolean(state.flashcards.isFlipped));
+
+      const ratingLabels = {
+        mastered: { text: 'Dominada', cls: 'bg-emerald-400/15 text-emerald-300 border border-emerald-400/35' },
+        hard: { text: 'Difícil', cls: 'bg-amber-400/15 text-amber-300 border border-amber-400/35' },
+        again: { text: 'Repasar de nuevo', cls: 'bg-rose-500/15 text-rose-300 border border-rose-500/35' }
+      };
+
+      const info = ratingLabels[card.rating] || { text: 'Sin evaluar', cls: 'bg-slate-800 text-slate-300' };
+      statusBadgeEl.textContent = info.text;
+      statusBadgeEl.className = `text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${info.cls}`;
+    }
+
+    function updateDeckStats(deck) {
+      const againEl = document.getElementById('stat-again');
+      const hardEl = document.getElementById('stat-hard');
+      const masteredEl = document.getElementById('stat-mastered');
+      const pctEl = document.getElementById('deck-mastery-percent');
+      const barEl = document.getElementById('deck-mastery-bar');
+
+      if (!deck || !deck.cards.length) {
+        againEl.textContent = '0';
+        hardEl.textContent = '0';
+        masteredEl.textContent = '0';
+        pctEl.textContent = '0%';
+        barEl.style.width = '0%';
+        return;
+      }
+
+      const total = deck.cards.length;
+      const againCount = deck.cards.filter((c) => !c.rating || c.rating === 'again').length;
+      const hardCount = deck.cards.filter((c) => c.rating === 'hard').length;
+      const masteredCount = deck.cards.filter((c) => c.rating === 'mastered').length;
+      const pct = Math.round((masteredCount / total) * 100);
+
+      againEl.textContent = String(againCount);
+      hardEl.textContent = String(hardCount);
+      masteredEl.textContent = String(masteredCount);
+      pctEl.textContent = `${pct}%`;
+      barEl.style.width = `${pct}%`;
+    }
+
+    function selectDeck(deckId) {
+      state.flashcards.activeDeckId = deckId;
+      state.flashcards.currentCardIndex = 0;
+      state.flashcards.isFlipped = false;
+      saveState();
+      renderFlashcardsModule();
+    }
+
+    function flipCurrentCard() {
+      const deck = getActiveDeck();
+      if (!deck || !deck.cards.length) return;
+      state.flashcards.isFlipped = !state.flashcards.isFlipped;
+      saveState();
+      renderFlashcardsModule();
+    }
+
+    function moveCard(delta) {
+      const deck = getActiveDeck();
+      if (!deck || !deck.cards.length) return;
+      const len = deck.cards.length;
+      state.flashcards.currentCardIndex = (state.flashcards.currentCardIndex + delta + len) % len;
+      state.flashcards.isFlipped = false;
+      saveState();
+      renderFlashcardsModule();
+    }
+
+    function rateCurrentCard(rating) {
+      const deck = getActiveDeck();
+      if (!deck || !deck.cards.length) {
+        showToast('Añade una tarjeta antes de calificar.', 'warning');
+        return;
+      }
+
+      const idx = state.flashcards.currentCardIndex;
+      deck.cards[idx].rating = rating;
+      state.flashcards.isFlipped = false;
+      // Avanzar suavemente a la siguiente tarjeta tras calificar
+      state.flashcards.currentCardIndex = (idx + 1) % deck.cards.length;
+
+      saveState();
+      renderFlashcardsModule();
+
+      const labels = {
+        again: 'Marcada para repasar de nuevo',
+        hard: 'Marcada como difícil',
+        mastered: '¡Tarjeta marcada como dominada!'
+      };
+      showToast(labels[rating] || 'Calificación guardada', rating === 'mastered' ? 'success' : 'info');
+    }
+
+    function deleteCurrentCard() {
+      const deck = getActiveDeck();
+      if (!deck || !deck.cards.length) return;
+      deck.cards.splice(state.flashcards.currentCardIndex, 1);
+      state.flashcards.isFlipped = false;
+      if (state.flashcards.currentCardIndex >= deck.cards.length) {
+        state.flashcards.currentCardIndex = 0;
+      }
+      saveState();
+      renderFlashcardsModule();
+      showToast('Tarjeta eliminada del mazo.', 'info');
+    }
+
+    function deleteActiveDeck() {
+      const deck = getActiveDeck();
+      if (!deck) return;
+      state.flashcards.decks = state.flashcards.decks.filter((d) => d.id !== deck.id);
+      state.flashcards.activeDeckId = state.flashcards.decks[0]?.id || null;
+      state.flashcards.currentCardIndex = 0;
+      state.flashcards.isFlipped = false;
+      saveState();
+      renderFlashcardsModule();
+      showToast(`Mazo "${deck.name}" eliminado.`, 'info');
+    }
+
+    /* =========================================================================
+       RESTAURAR DEMO Y LIMPIAR TODO
+       ========================================================================= */
+    function restoreDemoData() {
+      pausePomodoro();
+      state = createDemoState();
+      saveState();
+      renderAll();
+      showToast('Datos de ejemplo restaurados.', 'success');
+    }
+
+    function openConfirmClearModal() {
+      const modal = document.getElementById('confirm-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      document.getElementById('confirm-cancel-btn').focus();
+    }
+
+    function closeConfirmClearModal() {
+      const modal = document.getElementById('confirm-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function clearAllData() {
+      pausePomodoro();
+      const today = getTodayISO();
+      state = {
+        activeTab: state.activeTab,
+        reminders: [],
+        quickNote: '',
+        shortcuts: [],
+        tasks: [],
+        habits: [],
+        pomodoro: {
+          mode: 'pomodoro',
+          remainingSeconds: 25 * 60,
+          isRunning: false,
+          sessionsToday: 0,
+          sessionsDate: today
+        },
+        flashcards: {
+          activeDeckId: null,
+          currentCardIndex: 0,
+          isFlipped: false,
+          decks: []
+        }
+      };
+      saveState();
+      renderAll();
+      closeConfirmClearModal();
+      showToast('Todos los datos se han limpiado.', 'info');
+    }
+
+    /* =========================================================================
+       INICIALIZACIÓN Y EVENT LISTENERS
+       ========================================================================= */
+    function bindEvents() {
+      // Navegación por pestañas
+      document.querySelectorAll('.nav-tab').forEach((btn) => {
+        btn.addEventListener('click', () => setActiveTab(btn.dataset.tab));
+      });
+
+      // Botón rápido Pomodoro en barra superior
+      document.getElementById('quick-pomodoro-btn').addEventListener('click', () => {
+        setActiveTab('tasks');
+        document.getElementById('pomo-display').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+
+      // Toast cerrar
+      document.getElementById('toast-close').addEventListener('click', hideToast);
+
+      // Restaurar demo / Limpiar todo
+      document.getElementById('reset-demo-btn').addEventListener('click', restoreDemoData);
+      document.getElementById('clear-all-btn').addEventListener('click', openConfirmClearModal);
+      document.getElementById('confirm-cancel-btn').addEventListener('click', closeConfirmClearModal);
+      document.getElementById('confirm-accept-btn').addEventListener('click', clearAllData);
+
+      // Recordatorios del día
+      document.getElementById('reminder-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const input = document.getElementById('reminder-input');
+        const text = input.value.trim();
+        if (!text) return;
+        state.reminders.unshift({
+          id: `rem-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          text,
+          done: false
+        });
+        input.value = '';
+        saveState();
+        renderReminders();
+        showToast('Recordatorio añadido.', 'success');
+      });
+
+      document.getElementById('clear-done-reminders-btn').addEventListener('click', () => {
+        const before = state.reminders.length;
+        state.reminders = state.reminders.filter((r) => !r.done);
+        if (state.reminders.length !== before) {
+          saveState();
+          renderReminders();
+          showToast('Recordatorios completados limpiados.', 'info');
+        }
+      });
+
+      // Notas rápidas con autoguardado al escribir
+      const notesTextarea = document.getElementById('quick-notes-textarea');
+      const notesStatus = document.getElementById('notes-save-status');
+      notesTextarea.addEventListener('input', () => {
+        state.quickNote = notesTextarea.value;
+        document.getElementById('notes-char-count').textContent = `${state.quickNote.length} caracteres`;
+        notesStatus.textContent = 'Guardando...';
+        notesStatus.className = 'text-[11px] font-medium px-2.5 py-1 rounded-full bg-amber-400/10 text-amber-300 border border-amber-400/25';
+
+        clearTimeout(notesSaveTimeout);
+        notesSaveTimeout = setTimeout(() => {
+          saveState();
+          notesStatus.textContent = 'Guardado';
+          notesStatus.className = 'text-[11px] font-medium px-2.5 py-1 rounded-full bg-emerald-400/10 text-emerald-300 border border-emerald-400/25';
+        }, 220);
+      });
+
+      document.getElementById('clear-notes-btn').addEventListener('click', () => {
+        state.quickNote = '';
+        saveState();
+        renderQuickNotes();
+        showToast('Nota rápida borrada.', 'info');
+      });
+
+      // Enlaces más usados
+      document.getElementById('shortcut-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const titleInput = document.getElementById('shortcut-title');
+        const urlInput = document.getElementById('shortcut-url');
+        const title = titleInput.value.trim();
+        const safeUrl = normalizeURL(urlInput.value);
+
+        if (!title || !safeUrl) {
+          showToast('Ingresa un título y una URL válida.', 'error');
+          return;
+        }
+
+        state.shortcuts.push({
+          id: `sc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          title,
+          url: safeUrl
+        });
+        titleInput.value = '';
+        urlInput.value = '';
+        saveState();
+        renderShortcuts();
+        showToast('Acceso directo guardado.', 'success');
+      });
+
+      // Filtros de tareas
+      document.querySelectorAll('.task-filter-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          taskFilter = btn.dataset.taskFilter;
+          document.querySelectorAll('.task-filter-btn').forEach((b) => {
+            const active = b.dataset.taskFilter === taskFilter;
+            b.className = active
+              ? 'task-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-400/15 text-cyan-300 border border-cyan-400/35 transition'
+              : 'task-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white border border-transparent transition';
+          });
+          renderTasks();
+        });
+      });
+
+      // Agregar tarea
+      document.getElementById('task-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const titleEl = document.getElementById('task-title');
+        const subjectEl = document.getElementById('task-subject');
+        const priorityEl = document.getElementById('task-priority');
+
+        const title = titleEl.value.trim();
+        if (!title) return;
+
+        state.tasks.unshift({
+          id: `tsk-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          title,
+          subject: subjectEl.value.trim(),
+          priority: priorityEl.value,
+          completed: false
+        });
+
+        titleEl.value = '';
+        subjectEl.value = '';
+        priorityEl.value = 'media';
+        saveState();
+        renderTasks();
+        showToast('Tarea agregada al tablero.', 'success');
+      });
+
+      // Hábitos diarios
+      document.getElementById('habit-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const input = document.getElementById('habit-input');
+        const name = input.value.trim();
+        if (!name) return;
+
+        state.habits.push({
+          id: `hab-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          name,
+          streak: 0,
+          lastCompletedDate: null
+        });
+        input.value = '';
+        saveState();
+        renderHabits();
+        showToast('Hábito añadido.', 'success');
+      });
+
+      // Controles Pomodoro
+      document.querySelectorAll('.pomo-mode-btn').forEach((btn) => {
+        btn.addEventListener('click', () => selectPomodoroMode(btn.dataset.pomoMode));
+      });
+      document.getElementById('pomo-start-btn').addEventListener('click', startPomodoro);
+      document.getElementById('pomo-pause-btn').addEventListener('click', pausePomodoro);
+      document.getElementById('pomo-reset-btn').addEventListener('click', resetPomodoro);
+
+      // Flashcards: crear mazo
+      document.getElementById('deck-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const input = document.getElementById('deck-name-input');
+        const name = input.value.trim();
+        if (!name) return;
+
+        const newDeck = {
+          id: `deck-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          name,
+          cards: []
+        };
+        state.flashcards.decks.push(newDeck);
+        state.flashcards.activeDeckId = newDeck.id;
+        state.flashcards.currentCardIndex = 0;
+        state.flashcards.isFlipped = false;
+        input.value = '';
+        saveState();
+        renderFlashcardsModule();
+        showToast(`Mazo "${name}" creado.`, 'success');
+      });
+
+      document.getElementById('delete-deck-btn').addEventListener('click', deleteActiveDeck);
+
+      // Flashcards: añadir tarjeta
+      document.getElementById('card-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        let deck = getActiveDeck();
+        if (!deck) {
+          deck = {
+            id: `deck-${Date.now()}`,
+            name: 'Mazo General',
+            cards: []
+          };
+          state.flashcards.decks.push(deck);
+          state.flashcards.activeDeckId = deck.id;
+        }
+
+        const frontInput = document.getElementById('card-front');
+        const backInput = document.getElementById('card-back');
+        const front = frontInput.value.trim();
+        const back = backInput.value.trim();
+        if (!front || !back) return;
+
+        deck.cards.push({
+          id: `card-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          front,
+          back,
+          rating: 'again'
+        });
+
+        state.flashcards.currentCardIndex = deck.cards.length - 1;
+        state.flashcards.isFlipped = false;
+        frontInput.value = '';
+        backInput.value = '';
+        saveState();
+        renderFlashcardsModule();
+        showToast('Tarjeta añadida al mazo.', 'success');
+      });
+
+      // Flashcards: voltear, navegar, calificar y borrar
+      document.getElementById('flip-card-btn').addEventListener('click', flipCurrentCard);
+      document.getElementById('flashcard-inner').addEventListener('click', (ev) => {
+        if (ev.target.closest('button')) return;
+        flipCurrentCard();
+      });
+      document.getElementById('prev-card-btn').addEventListener('click', () => moveCard(-1));
+      document.getElementById('next-card-btn').addEventListener('click', () => moveCard(1));
+      document.getElementById('rate-again-btn').addEventListener('click', () => rateCurrentCard('again'));
+      document.getElementById('rate-hard-btn').addEventListener('click', () => rateCurrentCard('hard'));
+      document.getElementById('rate-mastered-btn').addEventListener('click', () => rateCurrentCard('mastered'));
+      document.getElementById('delete-current-card-btn').addEventListener('click', deleteCurrentCard);
+    }
+
+    function renderAll() {
+      setActiveTab(state.activeTab || 'dashboard');
+      renderReminders();
+      renderQuickNotes();
+      renderShortcuts();
+      renderTasks();
+      renderHabits();
+      renderPomodoro();
+      renderFlashcardsModule();
+      renderDashboardSummary();
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      updateClockAndGreeting();
+      setInterval(updateClockAndGreeting, 1000);
+      bindEvents();
+      renderAll();
+    });
+  </script>
+</body>
+</html>
